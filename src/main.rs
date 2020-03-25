@@ -1,8 +1,78 @@
+use fleetspeak::Packet;
+use std::ffi::CString;
+
 pub mod stat {
     include!(concat!(env!("OUT_DIR"), "/fleetspeak.stat.rs"));
+}
+
+fn libc_stat_syscall(path: &str) -> libc::stat {
+    unsafe {
+        // TODO : provide a real system call
+        std::mem::zeroed();
+    }
+}
+
+fn process_request(request: stat::Request) -> stat::Response {
+    let statbuf = libc_stat_syscall(&request.path[..]);
+
+    stat::Response {
+        path: request.path,
+        size: statbuf.st_size,
+        mode: statbuf.st_mode,
+
+        extra: Some(stat::response::Extra {
+            inode: statbuf.st_ino,
+            hardlinks_number: statbuf.st_nlink,
+
+            owner: Some(stat::response::extra::User {
+                uid: statbuf.st_uid,
+                name: String::new(),
+            }),
+            owner_group: Some(stat::response::extra::Group {
+                gid: statbuf.st_gid,
+                name: String::new(),
+            }),
+
+            last_access_time: Some(stat::response::extra::Time {
+                human_readable: String::new(),
+                seconds_since_epoch: Some(prost_types::Timestamp {
+                    seconds: statbuf.st_atime,
+                    nanos: statbuf.st_atime_nsec as i32,
+                }),
+            }),
+            last_data_modification_time: Some(stat::response::extra::Time {
+                human_readable: String::new(),
+                seconds_since_epoch: Some(prost_types::Timestamp {
+                    seconds: statbuf.st_mtime,
+                    nanos: statbuf.st_mtime_nsec as i32,
+                }),
+            }),
+            last_status_change_time: Some(stat::response::extra::Time {
+                human_readable: String::new(),
+                seconds_since_epoch: Some(prost_types::Timestamp {
+                    seconds: statbuf.st_ctime,
+                    nanos: statbuf.st_ctime_nsec as i32,
+                }),
+            }),
+        }),
+    }
 }
 
 fn main() {
     fleetspeak::startup("0.0.1")
         .expect("Failed to establish connection with Fleatspeak client");
+
+    loop {
+        let packet = fleetspeak::receive()
+            .expect("Failed to receive a message from the Fleetspeak server");
+
+        let request: stat::Request = packet.data;
+        let response = process_request(request);
+
+        fleetspeak::send(Packet {
+            service: packet.service,
+            kind: None,
+            data: response,
+        }).expect("Failed to send packet");
+    }
 }

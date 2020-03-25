@@ -72,6 +72,7 @@ name = "fleetspeak-rs-stat-service"
 version = "0.1.0"
 dependencies = [
  "fleetspeak",
+ "libc",
  "prost",
  "prost-build",
  "prost-types",
