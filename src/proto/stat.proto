@@ -10,21 +10,21 @@ message Request {
 
 message Response {
   string path = 1;
-  uint64 size = 2;
-  uint64 mode = 3;
+  int64 size = 2;
+  uint32 mode = 3;
 
   message Extra {
     uint64 inode = 1;
     uint64 hardlinks_number = 2;
 
     message User {
-      uint64 uid = 1;
+      uint32 uid = 1;
       string name = 2;
     }
     User owner = 3;
 
     message Group {
-      uint64 gid = 1;
+      uint32 gid = 1;
       string name = 2;
     }
     Group owner_group = 4;
