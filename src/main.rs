@@ -7,8 +7,15 @@ pub mod stat {
 
 fn libc_stat_syscall(path: &str) -> libc::stat {
     unsafe {
-        // TODO : provide a real system call
-        std::mem::zeroed();
+        let root = CString::new(path).unwrap();
+        let mut statbuf: libc::stat = std::mem::zeroed();
+
+        if libc::stat(root.as_ptr(), &mut statbuf) == 0 {
+            statbuf
+        } else {
+            // TODO : handle error
+            std::mem::zeroed()
+        }
     }
 }
 
