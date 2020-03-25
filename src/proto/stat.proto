@@ -1,0 +1,42 @@
+syntax = "proto3";
+
+package fleetspeak.stat;
+
+import "google/protobuf/timestamp.proto";
+
+message Request {
+  string path = 1;
+}
+
+message Response {
+  string path = 1;
+  uint64 size = 2;
+  uint64 mode = 3;
+
+  message Extra {
+    uint64 inode = 1;
+    uint64 hardlinks_number = 2;
+
+    message User {
+      uint64 uid = 1;
+      string name = 2;
+    }
+    User owner = 3;
+
+    message Group {
+      uint64 gid = 1;
+      string name = 2;
+    }
+    Group owner_group = 4;
+
+    message Time {
+      string human_readable = 1;
+      google.protobuf.Timestamp seconds_since_epoch = 2;
+    }
+    Time last_access_time = 5;
+    Time last_data_modification_time = 6;
+    Time last_status_change_time = 7;
+  }
+
+  Extra extra = 4;
+}
