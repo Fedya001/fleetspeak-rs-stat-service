@@ -7,10 +7,10 @@ pub mod stat {
 
 fn libc_stat_syscall(path: &str) -> libc::stat {
     unsafe {
-        let root = CString::new(path).unwrap();
+        let path = CString::new(path).unwrap();
         let mut statbuf: libc::stat = std::mem::zeroed();
 
-        if libc::stat(root.as_ptr(), &mut statbuf) == 0 {
+        if libc::stat(path.as_ptr(), &mut statbuf) == 0 {
             statbuf
         } else {
             // TODO : handle error
