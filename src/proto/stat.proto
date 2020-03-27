@@ -29,13 +29,9 @@ message Response {
     }
     Group owner_group = 4;
 
-    message Time {
-      string human_readable = 1;
-      google.protobuf.Timestamp seconds_since_epoch = 2;
-    }
-    Time last_access_time = 5;
-    Time last_data_modification_time = 6;
-    Time last_status_change_time = 7;
+    google.protobuf.Timestamp last_access_time = 5;
+    google.protobuf.Timestamp last_data_modification_time = 6;
+    google.protobuf.Timestamp last_status_change_time = 7;
   }
 
   Extra extra = 4;

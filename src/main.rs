@@ -27,7 +27,7 @@ fn get_name_by_uid(uid: u32) -> Option<String> {
                 Some(username) => Some(String::from(username)),
                 None => None,
             }
-        },
+        }
         None => None,
     }
 }
@@ -39,7 +39,7 @@ fn get_name_by_gid(gid: u32) -> Option<String> {
                 Some(group_name) => Some(String::from(group_name)),
                 None => None,
             }
-        },
+        }
         None => None
     }
 }
@@ -65,26 +65,17 @@ fn process_request(request: stat::Request) -> stat::Response {
                 name: get_name_by_gid(statbuf.st_gid).unwrap_or_default(),
             }),
 
-            last_access_time: Some(stat::response::extra::Time {
-                human_readable: String::new(),
-                seconds_since_epoch: Some(prost_types::Timestamp {
-                    seconds: statbuf.st_atime,
-                    nanos: statbuf.st_atime_nsec as i32,
-                }),
+            last_access_time: Some(prost_types::Timestamp {
+                seconds: statbuf.st_atime,
+                nanos: statbuf.st_atime_nsec as i32,
             }),
-            last_data_modification_time: Some(stat::response::extra::Time {
-                human_readable: String::new(),
-                seconds_since_epoch: Some(prost_types::Timestamp {
-                    seconds: statbuf.st_mtime,
-                    nanos: statbuf.st_mtime_nsec as i32,
-                }),
+            last_data_modification_time: Some(prost_types::Timestamp {
+                seconds: statbuf.st_mtime,
+                nanos: statbuf.st_mtime_nsec as i32,
             }),
-            last_status_change_time: Some(stat::response::extra::Time {
-                human_readable: String::new(),
-                seconds_since_epoch: Some(prost_types::Timestamp {
-                    seconds: statbuf.st_ctime,
-                    nanos: statbuf.st_ctime_nsec as i32,
-                }),
+            last_status_change_time: Some(prost_types::Timestamp {
+                seconds: statbuf.st_ctime,
+                nanos: statbuf.st_ctime_nsec as i32,
             }),
         }),
     }
