@@ -76,6 +76,7 @@ dependencies = [
  "prost",
  "prost-build",
  "prost-types",
+ "tempfile",
  "users",
 ]
 

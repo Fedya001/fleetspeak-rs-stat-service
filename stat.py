@@ -1,4 +1,5 @@
 import binascii
+import datetime
 import io
 import logging
 import stat
@@ -13,7 +14,6 @@ from fleetspeak.src.common.proto.fleetspeak.common_pb2 import Message
 
 from stat_pb2 import Request, Response
 
-
 FLAGS = flags.FLAGS
 
 flags.DEFINE_string(
@@ -27,11 +27,48 @@ flags.DEFINE_string(
     help="A path to the file to write the output to.")
 
 
+def format_timestamp(hint, timestamp):
+    return (
+            hint + " {\n"
+            f"  seconds: {timestamp.seconds}\n"
+            f"  nanos: {timestamp.nanos}\n"
+            f"  human readable: "
+            f"\"{datetime.datetime.fromtimestamp(timestamp.seconds)}\""
+            "\n}"
+    )
+
+
 def write(filedesc: IO[Text], response: Response):
-    filedesc.write(f"path: {response.path}\n")
-    filedesc.write(f"size: {response.size} bytes\n")
-    filedesc.write(f"mode: {stat.filemode(response.mode)}\n")
-    filedesc.write(f"extra: {response.extra}\n")
+    last_access = format_timestamp(
+        'last access', response.extra.last_access_time)
+    last_data_modification = format_timestamp(
+        'last data modification', response.extra.last_data_modification_time)
+    last_status_change = format_timestamp(
+        'last status change', response.extra.last_status_change_time)
+
+    if response.status.success:
+        response_text = (
+            f"path: {response.path}\n"
+            f"size: {response.size} bytes\n"
+            f"mode: {stat.filemode(response.mode)}\n"
+            f"node: {response.extra.inode}\n"
+            f"hardlinks number: {response.extra.hardlinks_number}\n"
+            "owner {\n"
+            f"  uid: {response.extra.owner.uid}\n"
+            f"  name: \"{response.extra.owner.name}\"\n"
+            "}\n"
+            "owner group {\n"
+            f"  gid: {response.extra.owner_group.gid}\n"
+            f"  name: \"{response.extra.owner_group.name}\"\n"
+            "}\n"
+            f"{last_access}\n"
+            f"{last_data_modification}\n"
+            f"{last_status_change}\n\n"
+        )
+        filedesc.write(response_text)
+    else:
+        filedesc.write(f"stat on \"{response.path}\" failed:\n")
+        filedesc.write(f"{response.status.error_details}\n\n")
 
 
 def listener(message: Message, context):

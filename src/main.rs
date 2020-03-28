@@ -1,21 +1,21 @@
 use fleetspeak::Packet;
 use std::ffi::CString;
 use users::{get_user_by_uid, get_group_by_gid};
+use std::io::Error;
 
 pub mod stat {
     include!(concat!(env!("OUT_DIR"), "/fleetspeak.stat.rs"));
 }
 
-fn libc_stat_syscall(path: &str) -> libc::stat {
+fn libc_stat_syscall(path: &str) -> Option<libc::stat> {
     unsafe {
         let path = CString::new(path).unwrap();
         let mut statbuf: libc::stat = std::mem::zeroed();
 
         if libc::stat(path.as_ptr(), &mut statbuf) == 0 {
-            statbuf
+            Some(statbuf)
         } else {
-            // TODO : handle error
-            std::mem::zeroed()
+            None
         }
     }
 }
@@ -44,8 +44,26 @@ fn get_name_by_gid(gid: u32) -> Option<String> {
     }
 }
 
+fn eval_response_status(statbuf: Option<libc::stat>) -> stat::response::Status {
+    match statbuf {
+        Some(_) => stat::response::Status {
+            success: true,
+            error_details: String::new(),
+        },
+        None => stat::response::Status {
+            success: false,
+            error_details: Error::last_os_error().to_string(),
+        }
+    }
+}
+
 fn process_request(request: stat::Request) -> stat::Response {
     let statbuf = libc_stat_syscall(&request.path[..]);
+    let status = eval_response_status(statbuf);
+
+    let statbuf = unsafe {
+        statbuf.unwrap_or(std::mem::zeroed())
+    };
 
     stat::Response {
         path: request.path,
@@ -78,6 +96,7 @@ fn process_request(request: stat::Request) -> stat::Response {
                 nanos: statbuf.st_ctime_nsec as i32,
             }),
         }),
+        status: Some(status),
     }
 }
 

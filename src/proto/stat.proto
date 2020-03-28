@@ -35,4 +35,18 @@ message Response {
   }
 
   Extra extra = 4;
+
+  // Represents response status, i.e.
+  // whether it completed with no errors or not.
+  message Status {
+    // True if request was successfully processed.
+    // Otherwise - else. In this case whole Response message is invalid.
+    // Details can be found in error_details.
+    bool success = 1;
+
+    // Details about error (matters iff success == false).
+    string error_details = 2;
+  }
+
+  Status status = 5;
 }
