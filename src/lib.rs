@@ -61,24 +61,14 @@ pub mod stat {
         }
     }
 
-    pub fn default_stat_proto() -> Response {
-        Response {
-            path: String::new(),
-            size: 0,
-            mode: 0,
-            extra: None,
-            status: None,
-        }
-    }
-
     pub fn process_request(request: Request) -> Response {
         let metadata = std::fs::metadata(&request.path);
         let status = eval_response_status(&metadata);
 
-        let mut response = default_stat_proto();
-        if metadata.is_ok() {
-            response = fill_stat_proto(metadata.unwrap());
-        }
+        let mut response = match metadata {
+            Ok(meta) => fill_stat_proto(meta),
+            Err(_) => Default::default()
+        };
 
         response.path = request.path;
         response.status = Some(status);
