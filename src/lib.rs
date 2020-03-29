@@ -134,31 +134,6 @@ mod tests {
     }
 
     #[test]
-    fn username_matches_uid() {
-        let iter = unsafe { users::all_users() };
-        for user in iter {
-            assert_eq!(get_name_by_uid(user.uid()).unwrap(),
-                       String::from(user.name().to_str().unwrap()));
-        }
-
-        // Test on non-existing user
-        let uid = u32::max_value() - 42;
-        assert!(get_name_by_uid(uid).is_none());
-    }
-
-    #[test]
-    fn group_name_matches_gid() {
-        for group in users::group_access_list().unwrap() {
-            assert_eq!(get_name_by_gid(group.gid()).unwrap(),
-                       String::from(group.name().to_str().unwrap()));
-        }
-
-        // Test on non-existing group
-        let gid = u32::max_value() - 42;
-        assert!(get_name_by_gid(gid).is_none());
-    }
-
-    #[test]
     fn response_status_no_false_positive() {
         assert!(!eval_response_status(&std::fs::metadata(
             "this/file/does/not-exist.i.believe")).success);
