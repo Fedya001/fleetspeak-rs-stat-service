@@ -1,5 +1,3 @@
-use fleetspeak::Packet;
-use users::{get_user_by_uid, get_group_by_gid};
 use std::os::unix::fs::MetadataExt;
 
 pub mod stat {
@@ -7,7 +5,7 @@ pub mod stat {
 }
 
 fn get_name_by_uid(uid: u32) -> Option<String> {
-    match get_user_by_uid(uid) {
+    match users::get_user_by_uid(uid) {
         Some(user) => {
             match user.name().to_str() {
                 Some(username) => Some(String::from(username)),
@@ -19,7 +17,7 @@ fn get_name_by_uid(uid: u32) -> Option<String> {
 }
 
 fn get_name_by_gid(gid: u32) -> Option<String> {
-    match get_group_by_gid(gid) {
+    match users::get_group_by_gid(gid) {
         Some(group) => {
             match group.name().to_str() {
                 Some(group_name) => Some(String::from(group_name)),
@@ -115,7 +113,7 @@ fn main() {
         let request: stat::Request = packet.data;
         let response = process_request(request);
 
-        fleetspeak::send(Packet {
+        fleetspeak::send(fleetspeak::Packet {
             service: packet.service,
             kind: None,
             data: response,
@@ -126,20 +124,17 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::NamedTempFile;
-    use std::fs::metadata;
     use std::io::Write;
-    use users::{all_users, group_access_list};
 
     #[test]
     fn process_request_works_with_regular_file() -> Result<(), std::io::Error> {
-        let mut tmp_file = NamedTempFile::new()?;
+        let mut tmp_file = tempfile::NamedTempFile::new()?;
         tmp_file.write(b"Test tmp file content.")?;
 
         let path = tmp_file.path().to_str().unwrap();
         let response = process_request(
             stat::Request { path: String::from(path) });
-        let meta = metadata(path)?;
+        let meta = std::fs::metadata(path)?;
 
         assert_eq!(response.path, path);
         assert_eq!(response.size, meta.len() as i64);
@@ -185,7 +180,7 @@ mod tests {
 
     #[test]
     fn username_matches_uid() {
-        let iter = unsafe { all_users() };
+        let iter = unsafe { users::all_users() };
         for user in iter {
             assert_eq!(get_name_by_uid(user.uid()).unwrap(),
                        String::from(user.name().to_str().unwrap()));
@@ -198,7 +193,7 @@ mod tests {
 
     #[test]
     fn group_name_matches_gid() {
-        for group in group_access_list().expect("Error looking up groups") {
+        for group in users::group_access_list().unwrap() {
             assert_eq!(get_name_by_gid(group.gid()).unwrap(),
                        String::from(group.name().to_str().unwrap()));
         }
@@ -213,7 +208,7 @@ mod tests {
         assert!(!eval_response_status(&std::fs::metadata(
             "this/file/does/not-exist.i.believe")).success);
 
-        let tmp_file = NamedTempFile::new().unwrap();
+        let tmp_file = tempfile::NamedTempFile::new().unwrap();
         let status = eval_response_status(&std::fs::metadata(
             tmp_file.path().to_str().unwrap()));
         assert!(status.success);
