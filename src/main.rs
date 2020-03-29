@@ -126,6 +126,7 @@ mod tests {
     use std::fs::metadata;
     use std::io::Write;
     use std::os::linux::fs::MetadataExt;
+    use users::{all_users, group_access_list};
 
     #[test]
     fn stat_syscall_works_with_regular_file() -> Result<(), Error> {
@@ -159,5 +160,30 @@ mod tests {
         let statbuf = libc_stat_syscall(
             "this/file/does/not-exist.i.believe");
         assert!(statbuf.is_none());
+    }
+
+    #[test]
+    fn username_matches_uid() {
+        let iter = unsafe { all_users() };
+        for user in iter {
+            assert_eq!(get_name_by_uid(user.uid()).unwrap(),
+                       String::from(user.name().to_str().unwrap()));
+        }
+
+        // Test on non-existing user
+        let uid = u32::max_value() - 42;
+        assert!(get_name_by_uid(uid).is_none());
+    }
+
+    #[test]
+    fn group_name_matches_gid() {
+        for group in group_access_list().expect("Error looking up groups") {
+            assert_eq!(get_name_by_gid(group.gid()).unwrap(),
+                       String::from(group.name().to_str().unwrap()));
+        }
+
+        // Test on non-existing group
+        let gid = u32::max_value() - 42;
+        assert!(get_name_by_gid(gid).is_none());
     }
 }
