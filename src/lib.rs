@@ -127,16 +127,21 @@ mod tests {
 
     #[test]
     fn process_request_works_with_nonexisting_file() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let nonexisting_file_path = temp_dir.path().join("does-not.exist");
+
         let response = process_request(Request {
-            path: String::from("his/file/does/not-exist.i.believe")
+            path: String::from(nonexisting_file_path.to_str().unwrap())
         });
         assert!(!response.status.unwrap().success);
     }
 
     #[test]
     fn response_status_no_false_positive() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let nonexisting_file_path = temp_dir.path().join("does-not.exist");
         assert!(!eval_response_status(&std::fs::metadata(
-            "this/file/does/not-exist.i.believe")).success);
+            String::from(nonexisting_file_path.to_str().unwrap()))).success);
     }
 
     #[test]
