@@ -159,10 +159,13 @@ mod tests {
     }
 
     #[test]
-    fn response_status_correct() {
+    fn response_status_no_false_positive() {
         assert!(!eval_response_status(&std::fs::metadata(
             "this/file/does/not-exist.i.believe")).success);
+    }
 
+    #[test]
+    fn response_status_no_false_negative() {
         let tmp_file = tempfile::NamedTempFile::new().unwrap();
         let status = eval_response_status(&std::fs::metadata(
             tmp_file.path().to_str().unwrap()));
