@@ -125,7 +125,7 @@ mod tests {
     use tempfile::NamedTempFile;
     use std::fs::metadata;
     use std::io::Write;
-    use std::os::linux::fs::MetadataExt;
+    use std::os::unix::fs::MetadataExt;
     use users::{all_users, group_access_list};
 
     #[test]
@@ -138,19 +138,19 @@ mod tests {
         let meta = metadata(path)?;
 
         assert_eq!(statbuf.st_size, meta.len() as i64);
-        assert_eq!(statbuf.st_mode, meta.st_mode());
-        assert_eq!(statbuf.st_ino, meta.st_ino());
-        assert_eq!(statbuf.st_nlink, meta.st_nlink());
+        assert_eq!(statbuf.st_mode, meta.mode());
+        assert_eq!(statbuf.st_ino, meta.ino());
+        assert_eq!(statbuf.st_nlink, meta.nlink());
 
-        assert_eq!(statbuf.st_uid, meta.st_uid());
-        assert_eq!(statbuf.st_gid, meta.st_gid());
+        assert_eq!(statbuf.st_uid, meta.uid());
+        assert_eq!(statbuf.st_gid, meta.gid());
 
-        assert_eq!(statbuf.st_atime, meta.st_atime());
-        assert_eq!(statbuf.st_atime_nsec, meta.st_atime_nsec());
-        assert_eq!(statbuf.st_mtime, meta.st_mtime());
-        assert_eq!(statbuf.st_mtime_nsec, meta.st_mtime_nsec());
-        assert_eq!(statbuf.st_ctime, meta.st_ctime());
-        assert_eq!(statbuf.st_ctime_nsec, meta.st_ctime_nsec());
+        assert_eq!(statbuf.st_atime, meta.atime());
+        assert_eq!(statbuf.st_atime_nsec, meta.atime_nsec());
+        assert_eq!(statbuf.st_mtime, meta.mtime());
+        assert_eq!(statbuf.st_mtime_nsec, meta.mtime_nsec());
+        assert_eq!(statbuf.st_ctime, meta.ctime());
+        assert_eq!(statbuf.st_ctime_nsec, meta.ctime_nsec());
 
         Ok(())
     }
