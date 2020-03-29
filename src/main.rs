@@ -186,4 +186,12 @@ mod tests {
         let gid = u32::max_value() - 42;
         assert!(get_name_by_gid(gid).is_none());
     }
+
+    #[test]
+    fn response_status_correct() {
+        assert!(!eval_response_status(None).success);
+
+        let statbuf = unsafe { std::mem::zeroed() };
+        assert!(eval_response_status(Some(statbuf)).success);
+    }
 }
