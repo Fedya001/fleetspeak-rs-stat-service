@@ -4,31 +4,15 @@ pub mod stat {
     pub use std::os::unix::fs::MetadataExt;
 
     pub fn get_name_by_uid(uid: u32) -> Option<String> {
-        match users::get_user_by_uid(uid) {
-            Some(user) => {
-                match user.name().to_str() {
-                    Some(username) => Some(String::from(username)),
-                    None => None,
-                }
-            }
-            None => None,
-        }
+        users::get_user_by_uid(uid)?.name().to_str().map(String::from)
     }
 
     pub fn get_name_by_gid(gid: u32) -> Option<String> {
-        match users::get_group_by_gid(gid) {
-            Some(group) => {
-                match group.name().to_str() {
-                    Some(group_name) => Some(String::from(group_name)),
-                    None => None,
-                }
-            }
-            None => None
-        }
+        users::get_group_by_gid(gid)?.name().to_str().map(String::from)
     }
 
     pub fn eval_response_status(metadata: &std::io::Result<std::fs::Metadata>)
-                            -> response::Status {
+                                -> response::Status {
         match metadata {
             Ok(_) => response::Status {
                 success: true,
