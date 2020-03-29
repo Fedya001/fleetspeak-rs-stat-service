@@ -1,23 +1,9 @@
 use fleetspeak::Packet;
-use std::ffi::CString;
 use users::{get_user_by_uid, get_group_by_gid};
-use std::io::Error;
+use std::os::unix::fs::MetadataExt;
 
 pub mod stat {
     include!(concat!(env!("OUT_DIR"), "/fleetspeak.stat.rs"));
-}
-
-fn libc_stat_syscall(path: &str) -> Option<libc::stat> {
-    unsafe {
-        let path = CString::new(path).unwrap();
-        let mut statbuf: libc::stat = std::mem::zeroed();
-
-        if libc::stat(path.as_ptr(), &mut statbuf) == 0 {
-            Some(statbuf)
-        } else {
-            None
-        }
-    }
 }
 
 fn get_name_by_uid(uid: u32) -> Option<String> {
@@ -44,60 +30,78 @@ fn get_name_by_gid(gid: u32) -> Option<String> {
     }
 }
 
-fn eval_response_status(statbuf: Option<libc::stat>) -> stat::response::Status {
-    match statbuf {
-        Some(_) => stat::response::Status {
+fn eval_response_status(metadata: &std::io::Result<std::fs::Metadata>)
+                        -> stat::response::Status {
+    match metadata {
+        Ok(_) => stat::response::Status {
             success: true,
             error_details: String::new(),
         },
-        None => stat::response::Status {
+        Err(e) => stat::response::Status {
             success: false,
-            error_details: Error::last_os_error().to_string(),
+            error_details: e.to_string(),
         }
     }
 }
 
-fn process_request(request: stat::Request) -> stat::Response {
-    let statbuf = libc_stat_syscall(&request.path[..]);
-    let status = eval_response_status(statbuf);
-
-    let statbuf = unsafe {
-        statbuf.unwrap_or(std::mem::zeroed())
-    };
-
+fn fill_stat_proto(meta: std::fs::Metadata) -> stat::Response {
     stat::Response {
-        path: request.path,
-        size: statbuf.st_size,
-        mode: statbuf.st_mode,
+        path: String::new(),
+        size: meta.len() as i64,
+        mode: meta.mode(),
 
         extra: Some(stat::response::Extra {
-            inode: statbuf.st_ino,
-            hardlinks_number: statbuf.st_nlink,
+            inode: meta.ino(),
+            hardlinks_number: meta.nlink(),
 
             owner: Some(stat::response::extra::User {
-                uid: statbuf.st_uid,
-                name: get_name_by_uid(statbuf.st_uid).unwrap_or_default(),
+                uid: meta.uid(),
+                name: get_name_by_uid(meta.uid()).unwrap_or_default(),
             }),
             owner_group: Some(stat::response::extra::Group {
-                gid: statbuf.st_gid,
-                name: get_name_by_gid(statbuf.st_gid).unwrap_or_default(),
+                gid: meta.gid(),
+                name: get_name_by_gid(meta.gid()).unwrap_or_default(),
             }),
 
             last_access_time: Some(prost_types::Timestamp {
-                seconds: statbuf.st_atime,
-                nanos: statbuf.st_atime_nsec as i32,
+                seconds: meta.atime(),
+                nanos: meta.atime_nsec() as i32,
             }),
             last_data_modification_time: Some(prost_types::Timestamp {
-                seconds: statbuf.st_mtime,
-                nanos: statbuf.st_mtime_nsec as i32,
+                seconds: meta.mtime(),
+                nanos: meta.mtime_nsec() as i32,
             }),
             last_status_change_time: Some(prost_types::Timestamp {
-                seconds: statbuf.st_ctime,
-                nanos: statbuf.st_ctime_nsec as i32,
+                seconds: meta.ctime(),
+                nanos: meta.ctime_nsec() as i32,
             }),
         }),
-        status: Some(status),
+        status: None,
     }
+}
+
+fn default_stat_proto() -> stat::Response {
+    stat::Response {
+        path: String::new(),
+        size: 0,
+        mode: 0,
+        extra: None,
+        status: None,
+    }
+}
+
+fn process_request(request: stat::Request) -> stat::Response {
+    let metadata = std::fs::metadata(&request.path);
+    let status = eval_response_status(&metadata);
+
+    let mut response = default_stat_proto();
+    if metadata.is_ok() {
+        response = fill_stat_proto(metadata.unwrap());
+    }
+
+    response.path = request.path;
+    response.status = Some(status);
+    response
 }
 
 fn main() {
@@ -125,41 +129,58 @@ mod tests {
     use tempfile::NamedTempFile;
     use std::fs::metadata;
     use std::io::Write;
-    use std::os::unix::fs::MetadataExt;
     use users::{all_users, group_access_list};
 
     #[test]
-    fn stat_syscall_works_with_regular_file() -> Result<(), Error> {
+    fn process_request_works_with_regular_file() -> Result<(), std::io::Error> {
         let mut tmp_file = NamedTempFile::new()?;
         tmp_file.write(b"Test tmp file content.")?;
 
         let path = tmp_file.path().to_str().unwrap();
-        let statbuf = libc_stat_syscall(path).unwrap();
+        let response = process_request(
+            stat::Request { path: String::from(path) });
         let meta = metadata(path)?;
 
-        assert_eq!(statbuf.st_size, meta.len() as i64);
-        assert_eq!(statbuf.st_mode, meta.mode());
-        assert_eq!(statbuf.st_ino, meta.ino());
-        assert_eq!(statbuf.st_nlink, meta.nlink());
+        assert_eq!(response.path, path);
+        assert_eq!(response.size, meta.len() as i64);
+        assert_eq!(response.mode, meta.mode());
 
-        assert_eq!(statbuf.st_uid, meta.uid());
-        assert_eq!(statbuf.st_gid, meta.gid());
+        let extra = response.extra.unwrap();
+        assert_eq!(extra.inode, meta.ino());
+        assert_eq!(extra.hardlinks_number, meta.nlink());
 
-        assert_eq!(statbuf.st_atime, meta.atime());
-        assert_eq!(statbuf.st_atime_nsec, meta.atime_nsec());
-        assert_eq!(statbuf.st_mtime, meta.mtime());
-        assert_eq!(statbuf.st_mtime_nsec, meta.mtime_nsec());
-        assert_eq!(statbuf.st_ctime, meta.ctime());
-        assert_eq!(statbuf.st_ctime_nsec, meta.ctime_nsec());
+        let owner = extra.owner.unwrap();
+        assert_eq!(owner.uid, meta.uid());
+        assert_eq!(owner.name,
+                   get_name_by_uid(meta.uid()).unwrap());
 
+        let owner_group = extra.owner_group.unwrap();
+        assert_eq!(owner_group.gid, meta.gid());
+        assert_eq!(owner_group.name,
+                   get_name_by_gid(meta.gid()).unwrap());
+
+        let atime = extra.last_access_time.unwrap();
+        assert_eq!(atime.seconds, meta.atime());
+        assert_eq!(atime.nanos, meta.atime_nsec() as i32);
+
+        let mtime = extra.last_data_modification_time.unwrap();
+        assert_eq!(mtime.seconds, meta.mtime());
+        assert_eq!(mtime.nanos, meta.mtime_nsec() as i32);
+
+        let ctime = extra.last_status_change_time.unwrap();
+        assert_eq!(ctime.seconds, meta.ctime());
+        assert_eq!(ctime.nanos, meta.ctime_nsec() as i32);
+
+        assert!(response.status.unwrap().success);
         Ok(())
     }
 
     #[test]
-    fn stat_syscall_works_with_nonexisting_file() {
-        let statbuf = libc_stat_syscall(
-            "this/file/does/not-exist.i.believe");
-        assert!(statbuf.is_none());
+    fn process_request_works_with_nonexisting_file() {
+        let response = process_request(stat::Request {
+            path: String::from("his/file/does/not-exist.i.believe")
+        });
+        assert!(!response.status.unwrap().success);
     }
 
     #[test]
@@ -189,9 +210,12 @@ mod tests {
 
     #[test]
     fn response_status_correct() {
-        assert!(!eval_response_status(None).success);
+        assert!(!eval_response_status(&std::fs::metadata(
+            "this/file/does/not-exist.i.believe")).success);
 
-        let statbuf = unsafe { std::mem::zeroed() };
-        assert!(eval_response_status(Some(statbuf)).success);
+        let tmp_file = NamedTempFile::new().unwrap();
+        let status = eval_response_status(&std::fs::metadata(
+            tmp_file.path().to_str().unwrap()));
+        assert!(status.success);
     }
 }
