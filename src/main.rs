@@ -118,3 +118,46 @@ fn main() {
         }).expect("Failed to send packet");
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::NamedTempFile;
+    use std::fs::metadata;
+    use std::io::Write;
+    use std::os::linux::fs::MetadataExt;
+
+    #[test]
+    fn stat_syscall_works_with_regular_file() -> Result<(), Error> {
+        let mut tmp_file = NamedTempFile::new()?;
+        tmp_file.write(b"Test tmp file content.")?;
+
+        let path = tmp_file.path().to_str().unwrap();
+        let statbuf = libc_stat_syscall(path).unwrap();
+        let meta = metadata(path)?;
+
+        assert_eq!(statbuf.st_size, meta.len() as i64);
+        assert_eq!(statbuf.st_mode, meta.st_mode());
+        assert_eq!(statbuf.st_ino, meta.st_ino());
+        assert_eq!(statbuf.st_nlink, meta.st_nlink());
+
+        assert_eq!(statbuf.st_uid, meta.st_uid());
+        assert_eq!(statbuf.st_gid, meta.st_gid());
+
+        assert_eq!(statbuf.st_atime, meta.st_atime());
+        assert_eq!(statbuf.st_atime_nsec, meta.st_atime_nsec());
+        assert_eq!(statbuf.st_mtime, meta.st_mtime());
+        assert_eq!(statbuf.st_mtime_nsec, meta.st_mtime_nsec());
+        assert_eq!(statbuf.st_ctime, meta.st_ctime());
+        assert_eq!(statbuf.st_ctime_nsec, meta.st_ctime_nsec());
+
+        Ok(())
+    }
+
+    #[test]
+    fn stat_syscall_works_with_nonexisting_file() {
+        let statbuf = libc_stat_syscall(
+            "this/file/does/not-exist.i.believe");
+        assert!(statbuf.is_none());
+    }
+}
