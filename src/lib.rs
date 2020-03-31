@@ -149,7 +149,7 @@ mod tests {
     }
 
     #[test]
-    fn response_status_no_false_positive() {
+    fn response_status_fails_no_such_file() {
         let temp_dir = tempfile::tempdir().unwrap();
         let nonexisting_file_path = temp_dir.path().join("does-not.exist");
         assert!(!eval_response_status(&std::fs::metadata(
@@ -157,7 +157,7 @@ mod tests {
     }
 
     #[test]
-    fn response_status_no_false_negative() {
+    fn response_status_success_regular_file() {
         let temp_file = tempfile::NamedTempFile::new().unwrap();
         let status = eval_response_status(&std::fs::metadata(
             temp_file.path().to_str().unwrap()));
