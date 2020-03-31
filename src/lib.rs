@@ -80,46 +80,58 @@ pub mod stat {
 mod tests {
     use super::stat::*;
     use std::io::Write;
+    use tempfile::NamedTempFile;
+    pub use std::os::unix::fs::PermissionsExt;
 
     #[test]
     fn process_request_works_with_regular_file() -> Result<(), std::io::Error> {
-        let mut tmp_file = tempfile::NamedTempFile::new()?;
-        tmp_file.write(b"Test tmp file content.")?;
+        let temp_dir = tempfile::tempdir().unwrap();
+        let mut temp_file = NamedTempFile::new_in(&temp_dir)?;
+        temp_file.write(b"Test tmp file content.")?;
+        let path = temp_file.path().to_str().unwrap();
 
-        let path = tmp_file.path().to_str().unwrap();
+        std::fs::set_permissions(path, PermissionsExt::from_mode(0o644))?;
+        std::fs::hard_link(path, temp_dir.path().join("hardlink1"))?;
+        std::fs::hard_link(path, temp_dir.path().join("hardlink2"))?;
+
+        let secs_before_request = std::time::SystemTime::now().duration_since(
+            std::time::SystemTime::UNIX_EPOCH).unwrap().as_secs();
         let response = process_request(
             Request { path: String::from(path) });
-        let meta = std::fs::metadata(path)?;
+        let secs_after_request = std::time::SystemTime::now().duration_since(
+            std::time::SystemTime::UNIX_EPOCH).unwrap().as_secs();
 
         assert_eq!(response.path, path);
-        assert_eq!(response.size, meta.len() as i64);
-        assert_eq!(response.mode, meta.mode());
+        assert_eq!(response.size, 22);
+        assert_eq!(response.mode & 0o644, 0o644);
 
+        let inode = std::fs::metadata(
+            temp_file.path().to_str().unwrap())?.ino();
         let extra = response.extra.unwrap();
-        assert_eq!(extra.inode, meta.ino());
-        assert_eq!(extra.hardlinks_number, meta.nlink());
+        assert_eq!(extra.inode, inode);
+        assert_eq!(extra.hardlinks_number, 3);
 
+        let current_uid = users::get_current_uid();
         let owner = extra.owner.unwrap();
-        assert_eq!(owner.uid, meta.uid());
-        assert_eq!(owner.name,
-                   get_name_by_uid(meta.uid()).unwrap());
+        assert_eq!(owner.uid, current_uid);
+        assert_eq!(owner.name, get_name_by_uid(current_uid).unwrap());
 
+        let current_gid = users::get_current_gid();
         let owner_group = extra.owner_group.unwrap();
-        assert_eq!(owner_group.gid, meta.gid());
-        assert_eq!(owner_group.name,
-                   get_name_by_gid(meta.gid()).unwrap());
+        assert_eq!(owner_group.gid, current_uid);
+        assert_eq!(owner_group.name, get_name_by_gid(current_gid).unwrap());
 
-        let atime = extra.last_access_time.unwrap();
-        assert_eq!(atime.seconds, meta.atime());
-        assert_eq!(atime.nanos, meta.atime_nsec() as i32);
+        let atime = extra.last_access_time.unwrap().seconds as u64;
+        assert!(secs_before_request <= atime);
+        assert!(secs_after_request >= atime);
 
-        let mtime = extra.last_data_modification_time.unwrap();
-        assert_eq!(mtime.seconds, meta.mtime());
-        assert_eq!(mtime.nanos, meta.mtime_nsec() as i32);
+        let mtime = extra.last_data_modification_time.unwrap().seconds as u64;
+        assert!(secs_before_request <= mtime);
+        assert!(secs_after_request >= mtime);
 
-        let ctime = extra.last_status_change_time.unwrap();
-        assert_eq!(ctime.seconds, meta.ctime());
-        assert_eq!(ctime.nanos, meta.ctime_nsec() as i32);
+        let ctime = extra.last_status_change_time.unwrap().seconds as u64;
+        assert!(secs_before_request >= ctime);
+        assert!(secs_after_request <= ctime);
 
         assert!(response.status.unwrap().success);
         Ok(())
@@ -146,9 +158,9 @@ mod tests {
 
     #[test]
     fn response_status_no_false_negative() {
-        let tmp_file = tempfile::NamedTempFile::new().unwrap();
+        let temp_file = tempfile::NamedTempFile::new().unwrap();
         let status = eval_response_status(&std::fs::metadata(
-            tmp_file.path().to_str().unwrap()));
+            temp_file.path().to_str().unwrap()));
         assert!(status.success);
     }
 }
