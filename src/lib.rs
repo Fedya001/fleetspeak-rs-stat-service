@@ -103,7 +103,7 @@ mod tests {
 
         assert_eq!(response.path, path);
         assert_eq!(response.size, 22);
-        assert_eq!(response.mode & 0o644, 0o644);
+        assert_eq!(response.mode & 0o777, 0o644);
 
         let inode = std::fs::metadata(
             temp_file.path().to_str().unwrap())?.ino();
