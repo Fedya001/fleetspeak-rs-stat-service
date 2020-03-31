@@ -86,6 +86,10 @@ mod tests {
     #[test]
     fn process_request_works_with_regular_file() -> Result<(), std::io::Error> {
         let temp_dir = tempfile::tempdir().unwrap();
+
+        let secs_before_create = std::time::SystemTime::now().duration_since(
+            std::time::SystemTime::UNIX_EPOCH).unwrap().as_secs();
+
         let mut temp_file = NamedTempFile::new_in(&temp_dir)?;
         temp_file.write(b"Test tmp file content.")?;
         let path = temp_file.path().to_str().unwrap();
@@ -94,8 +98,6 @@ mod tests {
         std::fs::hard_link(path, temp_dir.path().join("hardlink1"))?;
         std::fs::hard_link(path, temp_dir.path().join("hardlink2"))?;
 
-        let secs_before_request = std::time::SystemTime::now().duration_since(
-            std::time::SystemTime::UNIX_EPOCH).unwrap().as_secs();
         let response = process_request(
             Request { path: String::from(path) });
         let secs_after_request = std::time::SystemTime::now().duration_since(
@@ -122,15 +124,15 @@ mod tests {
         assert_eq!(owner_group.name, get_name_by_gid(current_gid).unwrap());
 
         let atime = extra.last_access_time.unwrap().seconds as u64;
-        assert!(secs_before_request <= atime);
+        assert!(secs_before_create <= atime);
         assert!(secs_after_request >= atime);
 
         let mtime = extra.last_data_modification_time.unwrap().seconds as u64;
-        assert!(secs_before_request <= mtime);
+        assert!(secs_before_create <= mtime);
         assert!(secs_after_request >= mtime);
 
         let ctime = extra.last_status_change_time.unwrap().seconds as u64;
-        assert!(secs_before_request >= ctime);
+        assert!(secs_before_create >= ctime);
         assert!(secs_after_request <= ctime);
 
         assert!(response.status.unwrap().success);
