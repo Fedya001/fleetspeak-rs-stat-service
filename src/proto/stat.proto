@@ -1,0 +1,52 @@
+syntax = "proto3";
+
+package fleetspeak.stat;
+
+import "google/protobuf/timestamp.proto";
+
+message Request {
+  string path = 1;
+}
+
+message Response {
+  string path = 1;
+  int64 size = 2;
+  uint32 mode = 3;
+
+  message Extra {
+    uint64 inode = 1;
+    uint64 hardlinks_number = 2;
+
+    message User {
+      uint32 uid = 1;
+      string name = 2;
+    }
+    User owner = 3;
+
+    message Group {
+      uint32 gid = 1;
+      string name = 2;
+    }
+    Group owner_group = 4;
+
+    google.protobuf.Timestamp last_access_time = 5;
+    google.protobuf.Timestamp last_data_modification_time = 6;
+    google.protobuf.Timestamp last_status_change_time = 7;
+  }
+
+  Extra extra = 4;
+
+  // Represents response status, i.e.
+  // whether it completed with no errors or not.
+  message Status {
+    // True if request was successfully processed.
+    // Otherwise - else. In this case whole Response message is invalid.
+    // Details can be found in error_details.
+    bool success = 1;
+
+    // Details about error (matters iff success == false).
+    string error_details = 2;
+  }
+
+  Status status = 5;
+}
